@@ -17,9 +17,15 @@ spec:
         image: postgres:15-alpine
         env:
         - name: POSTGRES_USER
-          value: user
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: postgres-user
         - name: POSTGRES_PASSWORD
-          value: password
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: postgres-password
         - name: POSTGRES_DB
           value: mydb
         ports:
@@ -154,9 +160,15 @@ spec:
         image: grafana/grafana:latest
         env:
         - name: GF_SECURITY_ADMIN_USER
-          value: admin
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: grafana-admin-user
         - name: GF_SECURITY_ADMIN_PASSWORD
-          value: admin
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: grafana-admin-password
         ports:
         - containerPort: 3000
         volumeMounts:
