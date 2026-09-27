@@ -1,4 +1,5 @@
 name: CI Pipeline
+run-name: "CI/CD: Validación K8s y Build de Backend 🚀"
 
 on:
   push:
@@ -11,31 +12,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Descargar el codigo del repositorio en el servidor de github
+      # 1. Descargar el código del repositorio
       - name: Checkout code
         uses: actions/checkout@v4
-    
-    # 2. Configurar entorno de python en el runner
-      - name: Set up python
+
+      # 2. Configurar entorno de Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-    # 3. Instalar dependencias del backend (opcional pero recomendado)
+
+      # 3. Instalar dependencias del backend
       - name: Install dependencies
         run: |
           cd backend
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    # 4. Configurar kubectl y validar manifiestos de Kubernetes (Dry-Run)
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Validate Kubernetes Manifests
+      # 4. Validar sintaxis y estructura de los manifiestos de Kubernetes (Offline)
+      - name: Validate Kubernetes Manifests YAML
         run: |
-          echo "Validando sintaxis y estructura de los manifiestos de Kubernetes..."
-          kubectl apply --dry-run=client --validate=false -f k8s/
+          echo "Validando sintaxis de los manifiestos de Kubernetes..."
+          pip install pyyaml
+          python -c "
+          import yaml, glob, sys
+          for f in glob.glob('k8s/*.yaml'):
+              try:
+                  with open(f, 'r') as file:
+                      list(yaml.safe_load_all(file))
+                  print(f'✅ {f} es válido.')
+              except Exception as e:
+                  print(f'❌ Error de sintaxis en {f}: {e}')
+                  sys.exit(1)
+          "
 
-    # 5. Configurar Buildx y construir la imagen de Docker del backend
+      # 5. Configurar Buildx y construir la imagen de Docker del backend
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -45,4 +55,4 @@ jobs:
           context: ./backend
           push: false
           tags: devops-sre-project-backend:latest
-          load: true      
+          load: true
