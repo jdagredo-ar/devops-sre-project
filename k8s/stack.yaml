@@ -109,12 +109,17 @@ spec:
         - name: config-volume
           mountPath: /etc/prometheus/prometheus.yml
           subPath: prometheus.yml
+        - name: rules-volume
+          mountPath: /etc/prometheus/rules
         - name: prometheus-storage
           mountPath: /prometheus
       volumes:
       - name: config-volume
         configMap:
           name: prometheus-config
+      - name: rules-volume
+        configMap:
+         name: prometheus-rules
       - name: prometheus-storage
         persistentVolumeClaim:
           claimName: prometheus-pvc
@@ -220,6 +225,9 @@ data:
     global:
       scrape_interval: 5s
 
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
     scrape_configs:
       - job_name: "prometheus"
         static_configs:
@@ -279,9 +287,36 @@ data:
       "liveNow": false,
       "panels": [
         {
+          "title": "SLO: API Availability (Target >= 99.9%)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(rate(http_requests_total{status!~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 99.9 }
+                ]
+              }
+            }
+          }
+        },
+        {
           "title": "Latencia (P99 / P95)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -293,7 +328,7 @@ data:
         {
           "title": "Tráfico (RPS)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -305,7 +340,7 @@ data:
         {
           "title": "Errores (Tasa HTTP)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -317,7 +352,7 @@ data:
         {
           "title": "Saturación (CPU del Proceso)",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -330,17 +365,17 @@ data:
       "refresh": "5s",
       "schemaVersion": 38,
       "style": "dark",
-      "tags": [],
+      "tags": ["sre", "slos"],
       "templating": { "list": [] },
       "time": { "from": "now-15m", "to": "now" },
       "timepicker": {},
       "timezone": "",
-      "title": "SRE Golden Signals - JPMC Lab",
+      "title": "SRE Golden Signals & SLOs - Portfolio Lab",
       "uid": "sre-golden-signals",
-      "version": 1,
+      "version": 2,
       "weekStart": ""
     }
----
+---    
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -356,3 +391,23 @@ data:
         url: http://prometheus-svc:9090
         isDefault: true
         uid: prometheus
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: default
+data:
+  alert.rules.yml: |
+    groups:
+    - name: sre-slo-alerts
+      rules:
+      - alert: ErrorBudgetBurnRateHigh
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))) > 0.001
+        for: 1m
+        labels:
+          severity: critical
+          team: sre-platform
+        annotations:
+          summary: "El presupuesto de errores del SLO (99.9%) se está consumiendo rápidamente"
+          description: "La tasa de errores HTTP 5xx supera el 0.1% permitido en una ventana de 5 minutos, quemando el Error Budget."
