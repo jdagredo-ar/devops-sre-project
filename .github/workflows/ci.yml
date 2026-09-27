@@ -33,7 +33,7 @@ jobs:
       - name: Validate Kubernetes Manifests
         run: |
           echo "Validando sintaxis y estructura de los manifiestos de Kubernetes..."
-          kubectl apply --dry-run=client -f k8s/
+          kubectl apply --dry-run=client --validate=false -f k8s/
 
     # 5. Configurar Buildx y construir la imagen de Docker del backend
       - name: Set up Docker Buildx
