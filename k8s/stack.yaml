@@ -125,7 +125,7 @@ spec:
   ports:
   - port: 9090
     targetPort: 9090
-    nodeport: 30090
+    nodePort: 30090
 ---
 apiVersion: apps/v1
 kind: Deployment
