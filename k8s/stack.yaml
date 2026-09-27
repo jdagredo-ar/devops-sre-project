@@ -128,6 +128,15 @@ spec:
       labels:
         app: grafana
     spec:
+      initContainers:
+      - name: init-dashboards
+        image: alpine:latest
+        command: ['sh', '-c', 'cp /tmp/config/*.json /var/lib/grafana/dashboards/ && chown -R 472:0 /var/lib/grafana/dashboards']
+        volumeMounts:
+        - name: dashboards-json-config
+          mountPath: /tmp/config
+        - name: dashboards-storage
+          mountPath: /var/lib/grafana/dashboards
       containers:
       - name: grafana
         image: grafana/grafana:latest
@@ -142,18 +151,19 @@ spec:
         - name: sc-dashboard-provider
           mountPath: /etc/grafana/provisioning/dashboards/dashboard.yaml
           subPath: dashboard.yaml
-        - name: dashboards-json
-          mountPath: /var/lib/grafana/dashboards/golden-signals.json
-          subPath: golden-signals.json
+        - name: dashboards-storage
+          mountPath: /var/lib/grafana/dashboards
         - name: sc-datasource
           mountPath: /etc/grafana/provisioning/datasources/
       volumes:
       - name: sc-dashboard-provider
         configMap:
           name: grafana-provisioning-dashboards
-      - name: dashboards-json
+      - name: dashboards-json-config
         configMap:
           name: grafana-dashboards-json
+      - name: dashboards-storage
+        emptyDir: {}
       - name: sc-datasource
         configMap:
           name: grafana-datasources
@@ -186,13 +196,6 @@ data:
         static_configs:
           - targets:
             - localhost:9090
-
-      - job_name: "demo"
-        static_configs:
-          - targets:
-            - demo.promlabs.com:10000
-            - demo.promlabs.com:10001
-            - demo.promlabs.com:10002
 
       - job_name: "devops-sre-backend"
         static_configs:
@@ -227,8 +230,24 @@ metadata:
 data:
   golden-signals.json: |
     {
-      "annotations": { "list": [] },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
       "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "liveNow": false,
       "panels": [
         {
           "title": "Latencia (P99 / P95)",
@@ -273,16 +292,24 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "prometheus" },
-              "expr": "rate(process_cpu_seconds_total[5m])",
-              "legendFormat": "CPU Usage"
+              "expr": "sum(rate(process_cpu_seconds_total[5m])) by (job)",
+              "legendFormat": "{{ job }}"
             }
           ]
         }
       ],
-      "title": "SRE Golden Signals - JPMC Lab",
       "refresh": "5s",
       "schemaVersion": 38,
-      "time": { "from": "now-15m", "to": "now" }
+      "style": "dark",
+      "tags": [],
+      "templating": { "list": [] },
+      "time": { "from": "now-15m", "to": "now" },
+      "timepicker": {},
+      "timezone": "",
+      "title": "SRE Golden Signals - JPMC Lab",
+      "uid": "sre-golden-signals",
+      "version": 1,
+      "weekStart": ""
     }
 ---
 apiVersion: v1
